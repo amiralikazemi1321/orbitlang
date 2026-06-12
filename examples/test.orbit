@@ -1,0 +1,7 @@
+set x = 10
+
+if x == 10 {
+print 99
+} else {
+print 1
+}

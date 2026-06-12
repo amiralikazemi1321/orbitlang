@@ -1,0 +1,8 @@
+[project]
+name = "orbitlang"
+version = "0.1.0"
+description = "A simple programming language made in Python"
+authors = [{name = "amirali"}]
+
+[project.scripts]
+orbit = "orbit.cli:main"

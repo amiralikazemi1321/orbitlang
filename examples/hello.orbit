@@ -1,0 +1,6 @@
+set x = 10
+
+if x > 5 {
+	print 99
+} else {
+	print 10
