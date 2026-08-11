@@ -1,0 +1,14 @@
+x = 10
+y = 5
+
+show x
+show x + y
+show x * y
+show x / y
+
+if x > y: show "x is bigger"
+
+if x == 10:
+    show "correct"
+else:
+    show "wrong"

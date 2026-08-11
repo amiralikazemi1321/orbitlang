@@ -1,0 +1,14 @@
+x = 15
+
+if x > 20:
+    show "big"
+elif x > 10:
+    show "medium"
+else:
+    show "small"
+
+x = 5
+
+if x > 20: show "big"
+elif x > 10: show "medium"
+else: show "small"

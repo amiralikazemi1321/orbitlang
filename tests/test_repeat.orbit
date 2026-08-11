@@ -1,0 +1,4 @@
+repeat 5:
+    show "hello"
+
+repeat 3: show "orbit"

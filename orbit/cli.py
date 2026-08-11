@@ -1,10 +1,11 @@
-import sys
 import os
+import sys
 
-# اضافه کردن مسیر پروژه به PYTHONPATH برای توسعه
+# Add the project root to PYTHONPATH for development.
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from orbit.interpreter import run_file
+
 
 def main():
     if len(sys.argv) < 3:
@@ -18,6 +19,7 @@ def main():
         run_file(filename)
     else:
         print("Unknown command:", command)
+
 
 if __name__ == "__main__":
     main()
