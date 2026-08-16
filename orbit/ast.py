@@ -67,3 +67,7 @@ class Program:
 class Repeat:
     count: object
     body: list
+
+@dataclass
+class Input:
+    prompt: object

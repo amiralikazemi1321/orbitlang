@@ -7,6 +7,7 @@ from orbit.ast import (
     UnaryOp,
     Assign,
     Show,
+    Input,
     If,
     While,
     Repeat,
@@ -521,6 +522,17 @@ class Parser:
         if token.type == "FALSE":
             self.advance()
             return Boolean(False)
+
+        if token.type == "INPUT":
+            self.advance()
+
+            self.expect("LPAREN")
+
+            prompt = self.parse_expression()
+
+            self.expect("RPAREN")
+
+            return Input(prompt)
 
         if token.type == "IDENTIFIER":
             self.advance()

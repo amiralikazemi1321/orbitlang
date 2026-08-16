@@ -7,6 +7,7 @@ from orbit.ast import (
     UnaryOp,
     Assign,
     Show,
+    Input,
     If,
     While,
     Program,
@@ -51,10 +52,6 @@ class Interpreter:
 
     def execute(self, statement):
 
-        # -----------------------------------------------------
-        # Assignment
-        # -----------------------------------------------------
-
         if isinstance(statement, Assign):
             value = self.evaluate(
                 statement.value
@@ -66,9 +63,6 @@ class Interpreter:
 
             return
 
-        # -----------------------------------------------------
-        # Show
-        # -----------------------------------------------------
 
         if isinstance(statement, Show):
             value = self.evaluate(
@@ -79,9 +73,6 @@ class Interpreter:
 
             return
 
-        # -----------------------------------------------------
-        # If
-        # -----------------------------------------------------
 
         if isinstance(statement, If):
 
@@ -119,9 +110,6 @@ class Interpreter:
 
             return
 
-        # -----------------------------------------------------
-        # While
-        # -----------------------------------------------------
 
         if isinstance(statement, While):
 
@@ -136,8 +124,12 @@ class Interpreter:
 
             return
 
+
         if isinstance(statement, Repeat):
-            count = self.evaluate(statement.count)
+
+            count = self.evaluate(
+                statement.count
+            )
 
             if not isinstance(count, int):
                 raise InterpreterError(
@@ -150,9 +142,12 @@ class Interpreter:
                 )
 
             for _ in range(count):
-                self.run_block(statement.body)
+                self.run_block(
+                    statement.body
+                )
 
             return
+
 
         raise InterpreterError(
             f"Unknown statement: "
@@ -168,11 +163,14 @@ class Interpreter:
         if isinstance(expression, Number):
             return expression.value
 
+
         if isinstance(expression, String):
             return expression.value
 
+
         if isinstance(expression, Boolean):
             return expression.value
+
 
         if isinstance(expression, Variable):
 
@@ -186,15 +184,33 @@ class Interpreter:
                 expression.name
             ]
 
+
+        # ==========================
+        # INPUT SUPPORT
+        # ==========================
+
+        if isinstance(expression, Input):
+
+            prompt = self.evaluate(
+                expression.prompt
+            )
+
+            return input(prompt)
+
+
         if isinstance(expression, BinaryOp):
+
             return self.evaluate_binary(
                 expression
             )
 
+
         if isinstance(expression, UnaryOp):
+
             return self.evaluate_unary(
                 expression
             )
+
 
         raise InterpreterError(
             f"Unknown expression: "
@@ -209,9 +225,6 @@ class Interpreter:
 
         operator = expression.operator
 
-        # -----------------------------------------------------
-        # AND
-        # -----------------------------------------------------
 
         if operator == "and":
 
@@ -228,9 +241,6 @@ class Interpreter:
 
             return self.is_truthy(right)
 
-        # -----------------------------------------------------
-        # OR
-        # -----------------------------------------------------
 
         if operator == "or":
 
@@ -247,6 +257,7 @@ class Interpreter:
 
             return self.is_truthy(right)
 
+
         left = self.evaluate(
             expression.left
         )
@@ -255,18 +266,18 @@ class Interpreter:
             expression.right
         )
 
-        # -----------------------------------------------------
-        # Arithmetic
-        # -----------------------------------------------------
 
         if operator == "+":
             return left + right
 
+
         if operator == "-":
             return left - right
 
+
         if operator == "*":
             return left * right
+
 
         if operator == "/":
 
@@ -277,6 +288,7 @@ class Interpreter:
 
             return left / right
 
+
         if operator == "%":
 
             if right == 0:
@@ -286,27 +298,30 @@ class Interpreter:
 
             return left % right
 
-        # -----------------------------------------------------
-        # Comparison
-        # -----------------------------------------------------
 
         if operator == "==":
             return left == right
 
+
         if operator == "!=":
             return left != right
+
 
         if operator == "<":
             return left < right
 
+
         if operator == ">":
             return left > right
+
 
         if operator == "<=":
             return left <= right
 
+
         if operator == ">=":
             return left >= right
+
 
         raise InterpreterError(
             f"Unknown operator: {operator}"
@@ -325,8 +340,10 @@ class Interpreter:
         if expression.operator == "-":
             return -value
 
+
         if expression.operator == "not":
             return not self.is_truthy(value)
+
 
         raise InterpreterError(
             f"Unknown unary operator: "
@@ -363,5 +380,7 @@ class Interpreter:
 # =============================================================
 
 def run_file(filename):
+
     interpreter = Interpreter()
+
     interpreter.run_file(filename)

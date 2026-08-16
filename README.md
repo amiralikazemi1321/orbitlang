@@ -1,3 +1,8 @@
+حق با توئه، اشتباه کردم. من باز هم به‌جای اینکه فقط محتوا رو داخل **یک بلاک markdown واحد** بدم، وسطش چندتا جداکننده و `id` گذاشتم که برای کپی کردن مناسب نبود.
+
+این بار کل README را در **یک فیلد Markdown خالی و یک‌تکه** می‌دم:
+
+````markdown
 # OrbitLang 🪐
 
 **OrbitLang** is a small, simple, and beginner-friendly programming language written in Python.
@@ -16,6 +21,8 @@ OrbitLang currently supports:
 * Numbers
 * Strings
 * Booleans
+* User input with `input()`
+* Output with `show`
 * Arithmetic operations
 * Comparisons
 * Logical operators
@@ -25,26 +32,31 @@ OrbitLang currently supports:
 * `repeat` loops
 * Indentation-based blocks
 * Comments
-* A Python-based lexer, parser, AST, and interpreter
+* Python-based lexer, parser, AST, and interpreter
+* Global `orbit` command for running programs from anywhere
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Installation
 
 Clone the repository:
 
 ```bash
 git clone https://github.com/amiralikazemi1321/orbitlang.git
 cd orbitlang
-```
+````
 
-Run an OrbitLang program:
+Install OrbitLang:
 
 ```bash
-orbit run examples/test.orbit
+pip install -e .
 ```
 
-You can also run a file directly through the Python entry point if you're working on the project locally.
+Now you can run OrbitLang programs from anywhere:
+
+```bash
+orbit run program.orbit
+```
 
 ---
 
@@ -67,6 +79,25 @@ Output:
 ```text
 10
 Orbit
+```
+
+---
+
+### Input
+
+OrbitLang supports getting values from the user using `input()`.
+
+```orbit
+name = input("What is your name? ")
+
+show name
+```
+
+Output:
+
+```text
+What is your name? Amir
+Amir
 ```
 
 ---
@@ -112,7 +143,7 @@ if x > 5:
 
 ### Conditions
 
-A normal multi-line condition:
+Multi-line:
 
 ```orbit
 x = 10
@@ -123,7 +154,7 @@ else:
     show "wrong"
 ```
 
-OrbitLang also supports short one-line conditions:
+One-line:
 
 ```orbit
 if x > 5: show "big"
@@ -177,65 +208,19 @@ while x <= 5:
     x = x + 1
 ```
 
-Output:
-
-```text
-0
-1
-2
-3
-4
-5
-```
-
-One-line loops are also supported:
-
-```orbit
-while x < 5: show x
-```
-
 ---
 
 ### `repeat`
-
-`repeat` is useful when you want to execute something a fixed number of times.
 
 ```orbit
 repeat 5:
     show "hello"
 ```
 
-Output:
-
-```text
-hello
-hello
-hello
-hello
-hello
-```
-
-One-line syntax:
+One-line:
 
 ```orbit
 repeat 3: show "Orbit"
-```
-
-Output:
-
-```text
-Orbit
-Orbit
-Orbit
-```
-
-The repeat count can also be an expression:
-
-```orbit
-x = 2
-
-repeat x + 1:
-    show x
 ```
 
 ---
@@ -261,9 +246,9 @@ show "hello # world"
 
 ## 🧠 How OrbitLang Works
 
-OrbitLang is implemented as a small interpreter pipeline:
+OrbitLang uses a simple interpreter pipeline:
 
-```text
+```
 Orbit source code
        │
        ▼
@@ -287,24 +272,9 @@ Orbit source code
 
 ### Lexer
 
-The lexer converts OrbitLang source code into tokens.
+The lexer converts source code into tokens.
 
-For example:
-
-```orbit
-x = 10
-```
-
-becomes a sequence containing tokens such as:
-
-```text
-IDENTIFIER
-OPERATOR
-NUMBER
-NEWLINE
-```
-
-The lexer also handles:
+It handles:
 
 * indentation
 * strings
@@ -313,47 +283,44 @@ The lexer also handles:
 * operators
 * comments
 
----
-
 ### Parser
 
-The parser takes the tokens produced by the lexer and builds an **Abstract Syntax Tree (AST)**.
+The parser converts tokens into an Abstract Syntax Tree (AST).
 
-For example:
+Example:
 
 ```orbit
 x = 10
 ```
 
-becomes an assignment node containing:
+becomes:
 
-```text
+```
 Assign
  ├── name: x
  └── value: Number(10)
 ```
 
----
-
 ### Interpreter
 
-The interpreter walks through the AST and executes the program.
+The interpreter executes the AST.
 
 It handles:
 
 * variables
 * expressions
+* input
+* output
 * arithmetic
 * comparisons
 * conditions
 * loops
-* output
 
 ---
 
 ## 📁 Project Structure
 
-```text
+```
 OrbitLang/
 │
 ├── orbit/
@@ -382,9 +349,7 @@ OrbitLang/
 
 ## 🧪 Tests
 
-OrbitLang includes small `.orbit` programs used to test the language.
-
-Run an individual test:
+Run a test:
 
 ```bash
 orbit run tests/test_basic.orbit
@@ -399,26 +364,15 @@ for f in tests/*.orbit; do
 done
 ```
 
-The tests currently cover:
-
-* basic expressions
-* variables
-* conditions
-* `elif`
-* `while`
-* `repeat`
-
 ---
 
 ## 🛠️ Development
 
-OrbitLang is written in **Python**.
+OrbitLang is written in Python.
 
-The interpreter is intentionally kept small so that the implementation is easy to read and modify.
+Main components:
 
-If you want to work on the language, the main components to look at are:
-
-```text
+```
 orbit/lexer.py
 orbit/parser.py
 orbit/ast.py
@@ -430,14 +384,12 @@ orbit/cli.py
 
 ## 🗺️ Roadmap
 
-OrbitLang is still a small language and is actively being developed.
+Possible future features:
 
-Possible future features include:
-
+* Data types
 * Functions
 * Lists
 * Dictionaries
-* More string operations
 * `break` and `continue`
 * Better error messages
 * Standard library
@@ -445,19 +397,17 @@ Possible future features include:
 * More comprehensive testing
 * Improved tooling
 
-The roadmap may change as the language evolves.
-
 ---
 
 ## 🎯 Philosophy
 
 OrbitLang is not intended to replace Python.
 
-Instead, it is a project for exploring how programming languages work while creating a language that is pleasant and simple to write.
+Instead, it is a project for exploring how programming languages work while creating a small and enjoyable language.
 
-The project focuses on understanding the fundamentals:
+The project focuses on:
 
-```text
+```
 Lexing
    ↓
 Parsing
@@ -473,7 +423,7 @@ Interpretation
 
 This project is currently under development.
 
-See the repository for the current license information.
+See the repository for current license information.
 
 ---
 
@@ -481,8 +431,9 @@ See the repository for the current license information.
 
 Ideas, bug reports, improvements, and experiments are welcome.
 
-If you're interested in programming languages, interpreters, or compilers, OrbitLang is a small project that can be a good place to experiment with these concepts.
+If you are interested in programming languages, interpreters, or compilers, OrbitLang is a small project for learning and experimenting.
 
 ---
 
 **OrbitLang — a small language exploring the world of programming languages. 🪐**
+

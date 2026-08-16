@@ -2,7 +2,9 @@ import os
 import sys
 
 # Add the project root to PYTHONPATH for development.
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(
+    os.path.dirname(os.path.dirname(__file__))
+)
 
 from orbit.interpreter import run_file
 
@@ -17,6 +19,7 @@ def main():
 
     if command == "run":
         run_file(filename)
+
     else:
         print("Unknown command:", command)
 
