@@ -21,7 +21,8 @@ KEYWORDS = {
     "and": "AND",
     "or": "OR",
     "not": "NOT",
-    "input": "INPUT"
+    "input": "INPUT",
+    "type": "TYPE",
 }
 
 

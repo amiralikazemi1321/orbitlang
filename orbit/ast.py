@@ -71,3 +71,7 @@ class Repeat:
 @dataclass
 class Input:
     prompt: object
+
+@dataclass
+class TypeOf:
+    value: object

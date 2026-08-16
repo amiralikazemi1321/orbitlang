@@ -12,6 +12,7 @@ from orbit.ast import (
     While,
     Repeat,
     Program,
+    TypeOf,
 )
 
 
@@ -533,6 +534,17 @@ class Parser:
             self.expect("RPAREN")
 
             return Input(prompt)
+
+        if token.type == "TYPE":
+            self.advance()
+
+            self.expect("LPAREN")
+
+            value = self.parse_expression()
+
+            self.expect("RPAREN")
+
+            return TypeOf(value)
 
         if token.type == "IDENTIFIER":
             self.advance()

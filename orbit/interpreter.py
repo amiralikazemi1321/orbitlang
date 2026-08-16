@@ -12,6 +12,7 @@ from orbit.ast import (
     While,
     Program,
     Repeat,
+    TypeOf,
 )
 
 from orbit.parser import parse_program
@@ -197,6 +198,25 @@ class Interpreter:
 
             return input(prompt)
 
+        if isinstance(expression, TypeOf):
+
+            value = self.evaluate(
+                expression.value
+            )
+
+            if isinstance(value, bool):
+                return "boolean"
+
+            if isinstance(value, int):
+                return "number"
+
+            if isinstance(value, float):
+                return "number"
+
+            if isinstance(value, str):
+                return "string"
+
+            return "unknown"
 
         if isinstance(expression, BinaryOp):
 
