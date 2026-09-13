@@ -13,6 +13,13 @@ from orbit.ast import (
     Program,
     Repeat,
     TypeOf,
+    TypedAssign,
+    Call,
+    For,
+    Break,
+    Continue,
+    FunctionDef,
+    Return,
 )
 
 from orbit.parser import parse_program
@@ -21,11 +28,21 @@ from orbit.parser import parse_program
 class InterpreterError(Exception):
     pass
 
+class BreakSignal(Exception):
+    pass
+
+class ContinueSignal(Exception):
+    pass
+
+class ReturnSignal(Exception):
+    def __init__(self, value):
+        self.value = value
 
 class Interpreter:
 
     def __init__(self):
         self.variables = {}
+        self.functions = {}
 
     # =========================================================
     # Program
@@ -113,21 +130,26 @@ class Interpreter:
 
 
         if isinstance(statement, While):
-
             while self.is_truthy(
                 self.evaluate(
                     statement.condition
                 )
             ):
-                self.run_block(
-                    statement.body
-                )
+                try:
+                    self.run_block(
+                        statement.body
+                    )
+
+                except ContinueSignal:
+                    continue
+
+                except BreakSignal:
+                    break
 
             return
 
 
         if isinstance(statement, Repeat):
-
             count = self.evaluate(
                 statement.count
             )
@@ -143,12 +165,90 @@ class Interpreter:
                 )
 
             for _ in range(count):
-                self.run_block(
-                    statement.body
-                )
+                try:
+                    self.run_block(
+                        statement.body
+                    )
+
+                except ContinueSignal:
+                    continue
+
+                except BreakSignal:
+                    break
 
             return
 
+        if isinstance(statement, For):
+            iterable = self.evaluate(statement.iterable)
+
+            if not isinstance(iterable, range):
+                raise InterpreterError(
+                    "For loop requires a range."
+                )
+
+            for value in iterable:
+                self.variables[statement.variable] = value
+
+                try:
+                    self.run_block(
+                        statement.body
+                    )
+
+                except ContinueSignal:
+                    continue
+
+                except BreakSignal:
+                    break
+
+            return
+
+        if isinstance(statement, TypedAssign):
+            value = self.evaluate(statement.value)
+
+            if statement.type_name == "number":
+                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                    raise InterpreterError(
+                        f"Expected number, got {type(value).__name__}."
+                    )
+
+            elif statement.type_name == "string":
+                if not isinstance(value, str):
+                    raise InterpreterError(
+                        f"Expected string, got {type(value).__name__}."
+                    )
+
+            elif statement.type_name == "boolean":
+                if not isinstance(value, bool):
+                    raise InterpreterError(
+                        f"Expected boolean, got {type(value).__name__}."
+                    )
+
+            self.variables[statement.name] = value
+
+            return
+
+        if isinstance(statement, Break):
+            raise BreakSignal()
+
+
+        if isinstance(statement, Continue):
+            raise ContinueSignal()
+
+        if isinstance(statement, FunctionDef):
+            self.functions[statement.name] = statement
+            return
+
+        if isinstance(statement, Call):
+            self.evaluate_call(statement)
+            return
+
+        if isinstance(statement, Return):
+            value = None
+
+            if statement.value is not None:
+                value = self.evaluate(statement.value)
+
+            raise ReturnSignal(value)
 
         raise InterpreterError(
             f"Unknown statement: "
@@ -218,6 +318,9 @@ class Interpreter:
 
             return "unknown"
 
+        if isinstance(expression, Call):
+            return self.evaluate_call(expression)
+
         if isinstance(expression, BinaryOp):
 
             return self.evaluate_binary(
@@ -235,6 +338,76 @@ class Interpreter:
         raise InterpreterError(
             f"Unknown expression: "
             f"{type(expression).__name__}"
+        )
+
+    def evaluate_call(self, expression):
+        if expression.name in self.functions:
+            function = self.functions[expression.name]
+
+            if len(expression.arguments) != len(function.parameters):
+                raise InterpreterError(
+                    f"Function '{expression.name}' expects "
+                    f"{len(function.parameters)} arguments."
+                )
+
+            old_variables = self.variables
+
+            self.variables = old_variables.copy()
+
+            for parameter, argument in zip(
+                function.parameters,
+                expression.arguments,
+            ):
+                self.variables[parameter] = self.evaluate(argument)
+
+            try:
+                self.run_block(function.body)
+
+            except ReturnSignal as signal:
+                self.variables = old_variables
+                return signal.value
+
+            self.variables = old_variables
+
+            return None
+        
+        if expression.name == "range":
+            arguments = [
+                self.evaluate(argument)
+                for argument in expression.arguments
+            ]
+
+            if not all(
+                isinstance(value, int)
+                and not isinstance(value, bool)
+                for value in arguments
+            ):
+                raise InterpreterError(
+                    "range() arguments must be integers."
+                )
+
+            if len(arguments) == 1:
+                return range(arguments[0])
+
+            if len(arguments) == 2:
+                return range(
+                    arguments[0],
+                    arguments[1],
+                )
+
+            if len(arguments) == 3:
+                return range(
+                    arguments[0],
+                    arguments[1],
+                    arguments[2],
+                )
+
+            raise InterpreterError(
+                "range() expects 1 to 3 arguments."
+            )
+
+        raise InterpreterError(
+            f"Unknown function: {expression.name}"
         )
 
     # =========================================================

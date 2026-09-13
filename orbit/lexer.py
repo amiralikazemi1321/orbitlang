@@ -16,6 +16,10 @@ KEYWORDS = {
     "elif": "ELIF",
     "while": "WHILE",
     "repeat": "REPEAT",
+    "for": "FOR",
+    "in": "IN",
+    "break": "BREAK",
+    "continue": "CONTINUE",
     "true": "TRUE",
     "false": "FALSE",
     "and": "AND",
@@ -23,6 +27,12 @@ KEYWORDS = {
     "not": "NOT",
     "input": "INPUT",
     "type": "TYPE",
+    "func": "FUNC",
+    "return": "RETURN",
+
+    "number": "NUMBER_TYPE",
+    "string": "STRING_TYPE",
+    "boolean": "BOOLEAN_TYPE",
 }
 
 

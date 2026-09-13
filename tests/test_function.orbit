@@ -1,0 +1,9 @@
+func greet(name):
+    show name
+
+greet("Amir")
+
+func add(a, b):
+    show a + b
+
+add(10, 20)

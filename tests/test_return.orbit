@@ -1,0 +1,11 @@
+func add(a, b):
+    return a + b
+
+show add(10, 20)
+
+func double(x):
+    return x * 2
+
+number result = double(7)
+
+show result

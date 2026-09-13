@@ -69,9 +69,45 @@ class Repeat:
     body: list
 
 @dataclass
+class For:
+    variable: str
+    iterable: object
+    body: list
+    
+@dataclass
+class FunctionDef:
+    name: str
+    parameters: list
+    body: list
+
+@dataclass
+class Return:
+    value: object | None
+    
+@dataclass
+class Break:
+    pass
+
+@dataclass
+class Continue:
+    pass
+
+@dataclass
 class Input:
     prompt: object
 
 @dataclass
 class TypeOf:
     value: object
+
+@dataclass
+class Call:
+    name: str
+    arguments: list
+
+@dataclass
+class TypedAssign:
+    type_name: str
+    name: str
+    value: object
+

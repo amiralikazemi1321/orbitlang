@@ -11,13 +11,25 @@ from orbit.ast import (
     If,
     While,
     Repeat,
+    For,
+    Break,
+    Continue,
     Program,
     TypeOf,
+    TypedAssign,
+    Call,
+    FunctionDef,
+    Return,
 )
 
 
 class ParserError(Exception):
-    pass
+    def __init__(self, message, line, column):
+        self.message = message
+        self.line = line
+        self.column = column
+
+        super().__init__(message)
 
 
 class Parser:
@@ -60,11 +72,12 @@ class Parser:
             token = self.current()
 
             raise ParserError(
-                f"Expected {token_type}, "
-                f"got {token.type} "
-                f"at line {token.line}, "
-                f"column {token.column}"
+                f"Expected {token_type}, got {token.type}",
+                token.line,
+                token.column,
             )
+
+        return self.advance()
 
         return self.advance()
 
@@ -106,13 +119,93 @@ class Parser:
         if token.type == "REPEAT":
             return self.parse_repeat()
 
-        if token.type == "IDENTIFIER":
+        if token.type == "FOR":
+            return self.parse_for()
+
+        if self.match("BREAK"):
+            self.match("NEWLINE")
+            return Break()
+
+        if self.match("CONTINUE"):
+            self.match("NEWLINE")
+            return Continue()
+
+        if self.match("RETURN"):
+            if self.check("NEWLINE") or self.check("DEDENT"):
+                return Return(None)
+
+            value = self.parse_expression()
+            self.match("NEWLINE")
+
+            return Return(value)
+        
+        if token.type in {
+            "NUMBER_TYPE",
+            "STRING_TYPE",
+            "BOOLEAN_TYPE",
+        }:
+            return self.parse_typed_assignment()
+
+        if self.match("FUNC"):
+            return self.parse_function()
+
+        if self.check("IDENTIFIER"):
+            if self.peek().type == "LPAREN":
+                expression = self.parse_expression()
+                self.match("NEWLINE")
+                return expression
+
             return self.parse_assignment()
 
         raise ParserError(
             f"Unexpected token {token.type} "
             f"at line {token.line}, "
             f"column {token.column}"
+        )
+
+    # =========================================================
+    #  function
+    # =========================================================
+
+    def parse_function(self):
+        name = self.expect("IDENTIFIER").value
+
+        self.expect("LPAREN")
+
+        parameters = []
+
+        if not self.check("RPAREN"):
+            parameters.append(
+                self.expect("IDENTIFIER").value
+            )
+
+            while self.match("COMMA"):
+                parameters.append(
+                    self.expect("IDENTIFIER").value
+                )
+
+        self.expect("RPAREN")
+        self.expect("COLON")
+
+        self.expect("NEWLINE")
+        self.expect("INDENT")
+
+        body = []
+
+        self.skip_newlines()
+
+        while not self.check("DEDENT"):
+            body.append(
+                self.parse_statement()
+            )
+            self.skip_newlines()
+
+        self.expect("DEDENT")
+
+        return FunctionDef(
+            name,
+            parameters,
+            body,
         )
 
     # =========================================================
@@ -129,6 +222,27 @@ class Parser:
         self.match("NEWLINE")
 
         return Assign(name, value)
+
+    # =========================================================
+    # data type
+    # =========================================================
+
+    def parse_typed_assignment(self):
+        type_name = self.advance().value
+
+        name = self.expect("IDENTIFIER").value
+
+        self.expect_operator("=")
+
+        value = self.parse_expression()
+
+        self.match("NEWLINE")
+
+        return TypedAssign(
+            type_name,
+            name,
+            value,
+        )
 
     # =========================================================
     # Show
@@ -389,6 +503,53 @@ class Parser:
             count,
             body,
         )
+    
+    # =========================================================
+    # for
+    # =========================================================
+
+    def parse_for(self):
+        self.expect("FOR")
+
+        variable = self.expect("IDENTIFIER").value
+
+        self.expect("IN")
+
+        iterable = self.parse_expression()
+
+        self.expect("COLON")
+
+        if not self.check("NEWLINE"):
+            body = [
+                self.parse_statement()
+            ]
+
+            return For(
+                variable,
+                iterable,
+                body,
+            )
+
+        self.expect("NEWLINE")
+        self.expect("INDENT")
+
+        body = []
+
+        self.skip_newlines()
+
+        while not self.check("DEDENT"):
+            body.append(
+                self.parse_statement()
+            )
+            self.skip_newlines()
+
+        self.expect("DEDENT")
+
+        return For(
+            variable,
+            iterable,
+            body,
+        )
 
     # =========================================================
     # Expressions
@@ -547,6 +708,33 @@ class Parser:
             return TypeOf(value)
 
         if token.type == "IDENTIFIER":
+            name = self.advance().value
+
+            if self.check("LPAREN"):
+                self.advance()
+
+                arguments = []
+
+                if not self.check("RPAREN"):
+                    arguments.append(
+                        self.parse_expression()
+                    )
+
+                    while self.match("COMMA"):
+                        arguments.append(
+                            self.parse_expression()
+                        )
+
+                self.expect("RPAREN")
+
+                return Call(
+                    name,
+                    arguments,
+                )
+
+            return Variable(name)
+
+        if token.type == "IDENTIFIER":
             self.advance()
             return Variable(token.value)
 
@@ -560,10 +748,9 @@ class Parser:
             return expression
 
         raise ParserError(
-            f"Expected expression, "
-            f"got {token.type} "
-            f"at line {token.line}, "
-            f"column {token.column}"
+            f"Expected expression, got {token.type}",
+            token.line,
+            token.column,
         )
 
     # =========================================================
@@ -582,8 +769,9 @@ class Parser:
 
             raise ParserError(
                 f"Expected operator {operator!r}, "
-                f"got {token.value!r} "
-                f"at line {token.line}"
+                f"got {token.value!r}",
+                token.line,
+                token.column,
             )
 
         return self.advance()

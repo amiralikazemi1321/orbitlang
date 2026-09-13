@@ -1,0 +1,7 @@
+number age = 13
+string name = "Amir"
+boolean active = true
+
+show age
+show name
+show active
