@@ -79,7 +79,7 @@ After installation, the `orbit` command will be available from your terminal.
 
 ## ▶️ Running OrbitLang
 
-Create a file with the `.orbit` extension:
+Create a .orbit file:
 
 ```orbit
 show "Hello, OrbitLang!"
