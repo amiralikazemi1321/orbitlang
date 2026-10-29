@@ -6,3 +6,6 @@ authors = [{name = "amirali"}]
 
 [project.scripts]
 orbit = "orbit.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["orbit", "orbit.*"]

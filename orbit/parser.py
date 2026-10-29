@@ -1,3 +1,4 @@
+
 from orbit.ast import (
     Number,
     String,
@@ -20,6 +21,9 @@ from orbit.ast import (
     Call,
     FunctionDef,
     Return,
+    ListLiteral,
+    Index,
+    IndexAssign,
 )
 
 
@@ -28,12 +32,10 @@ class ParserError(Exception):
         self.message = message
         self.line = line
         self.column = column
-
         super().__init__(message)
 
 
 class Parser:
-
     def __init__(self, tokens):
         self.tokens = tokens
         self.position = 0
@@ -55,7 +57,10 @@ class Parser:
 
     def advance(self):
         token = self.current()
-        self.position += 1
+
+        if not self.check("EOF"):
+            self.position += 1
+
         return token
 
     def check(self, token_type):
@@ -79,11 +84,32 @@ class Parser:
 
         return self.advance()
 
-        return self.advance()
-
     def skip_newlines(self):
         while self.match("NEWLINE"):
             pass
+
+    # =========================================================
+    # Operators
+    # =========================================================
+
+    def check_operator(self, operator):
+        return (
+            self.current().type == "OPERATOR"
+            and self.current().value == operator
+        )
+
+    def expect_operator(self, operator):
+        if not self.check_operator(operator):
+            token = self.current()
+
+            raise ParserError(
+                f"Expected operator {operator!r}, "
+                f"got {token.value!r}",
+                token.line,
+                token.column,
+            )
+
+        return self.advance()
 
     # =========================================================
     # Program
@@ -138,7 +164,7 @@ class Parser:
             self.match("NEWLINE")
 
             return Return(value)
-        
+
         if token.type in {
             "NUMBER_TYPE",
             "STRING_TYPE",
@@ -160,11 +186,13 @@ class Parser:
         raise ParserError(
             f"Unexpected token {token.type} "
             f"at line {token.line}, "
-            f"column {token.column}"
+            f"column {token.column}",
+            token.line,
+            token.column,
         )
 
     # =========================================================
-    #  function
+    # Function
     # =========================================================
 
     def parse_function(self):
@@ -186,7 +214,6 @@ class Parser:
 
         self.expect("RPAREN")
         self.expect("COLON")
-
         self.expect("NEWLINE")
         self.expect("INDENT")
 
@@ -194,55 +221,59 @@ class Parser:
 
         self.skip_newlines()
 
-        while not self.check("DEDENT"):
-            body.append(
-                self.parse_statement()
-            )
+        while not self.check("DEDENT") and not self.check("EOF"):
+            body.append(self.parse_statement())
             self.skip_newlines()
 
         self.expect("DEDENT")
 
-        return FunctionDef(
-            name,
-            parameters,
-            body,
-        )
+        return FunctionDef(name, parameters, body)
 
     # =========================================================
-    # Assignment
+    # Assignment, including indexed assignment
     # =========================================================
 
     def parse_assignment(self):
         name = self.expect("IDENTIFIER").value
+        target = Variable(name)
+
+        # Parse chained indexing:
+        # numbers[0]
+        # matrix[1][0]
+        while self.match("LBRACKET"):
+            index = self.parse_expression()
+            self.expect("RBRACKET")
+
+            target = Index(target, index)
 
         self.expect_operator("=")
 
         value = self.parse_expression()
-
         self.match("NEWLINE")
 
-        return Assign(name, value)
+        if isinstance(target, Variable):
+            return Assign(target.name, value)
+
+        return IndexAssign(
+            target.collection,
+            target.index,
+            value,
+        )
 
     # =========================================================
-    # data type
+    # Typed assignment
     # =========================================================
 
     def parse_typed_assignment(self):
         type_name = self.advance().value
-
         name = self.expect("IDENTIFIER").value
 
         self.expect_operator("=")
 
         value = self.parse_expression()
-
         self.match("NEWLINE")
 
-        return TypedAssign(
-            type_name,
-            name,
-            value,
-        )
+        return TypedAssign(type_name, name, value)
 
     # =========================================================
     # Show
@@ -252,7 +283,6 @@ class Parser:
         self.expect("SHOW")
 
         value = self.parse_expression()
-
         self.match("NEWLINE")
 
         return Show(value)
@@ -265,28 +295,19 @@ class Parser:
         self.expect("IF")
 
         condition = self.parse_expression()
-
         self.expect("COLON")
-
-        # -----------------------------------------------------
-        # One-line IF
-        # -----------------------------------------------------
 
         if not self.check("NEWLINE"):
             body = [self.parse_statement()]
-
             elif_branches = []
 
             while self.check("ELIF"):
                 self.advance()
 
                 elif_condition = self.parse_expression()
-
                 self.expect("COLON")
 
-                elif_body = [
-                    self.parse_statement()
-                ]
+                elif_body = [self.parse_statement()]
 
                 elif_branches.append(
                     (elif_condition, elif_body)
@@ -296,12 +317,8 @@ class Parser:
 
             if self.check("ELSE"):
                 self.advance()
-
                 self.expect("COLON")
-
-                else_body = [
-                    self.parse_statement()
-                ]
+                else_body = [self.parse_statement()]
 
             return If(
                 condition,
@@ -310,10 +327,6 @@ class Parser:
                 else_body,
             )
 
-        # -----------------------------------------------------
-        # Multi-line IF
-        # -----------------------------------------------------
-
         self.expect("NEWLINE")
         self.expect("INDENT")
 
@@ -321,17 +334,11 @@ class Parser:
 
         self.skip_newlines()
 
-        while not self.check("DEDENT"):
-            body.append(
-                self.parse_statement()
-            )
+        while not self.check("DEDENT") and not self.check("EOF"):
+            body.append(self.parse_statement())
             self.skip_newlines()
 
         self.expect("DEDENT")
-
-        # -----------------------------------------------------
-        # ELIF
-        # -----------------------------------------------------
 
         elif_branches = []
 
@@ -339,14 +346,10 @@ class Parser:
             self.advance()
 
             elif_condition = self.parse_expression()
-
             self.expect("COLON")
 
             if not self.check("NEWLINE"):
-                elif_body = [
-                    self.parse_statement()
-                ]
-
+                elif_body = [self.parse_statement()]
             else:
                 self.expect("NEWLINE")
                 self.expect("INDENT")
@@ -355,10 +358,8 @@ class Parser:
 
                 self.skip_newlines()
 
-                while not self.check("DEDENT"):
-                    elif_body.append(
-                        self.parse_statement()
-                    )
+                while not self.check("DEDENT") and not self.check("EOF"):
+                    elif_body.append(self.parse_statement())
                     self.skip_newlines()
 
                 self.expect("DEDENT")
@@ -367,22 +368,14 @@ class Parser:
                 (elif_condition, elif_body)
             )
 
-        # -----------------------------------------------------
-        # ELSE
-        # -----------------------------------------------------
-
         else_body = None
 
         if self.check("ELSE"):
             self.advance()
-
             self.expect("COLON")
 
             if not self.check("NEWLINE"):
-                else_body = [
-                    self.parse_statement()
-                ]
-
+                else_body = [self.parse_statement()]
             else:
                 self.expect("NEWLINE")
                 self.expect("INDENT")
@@ -391,10 +384,8 @@ class Parser:
 
                 self.skip_newlines()
 
-                while not self.check("DEDENT"):
-                    else_body.append(
-                        self.parse_statement()
-                    )
+                while not self.check("DEDENT") and not self.check("EOF"):
+                    else_body.append(self.parse_statement())
                     self.skip_newlines()
 
                 self.expect("DEDENT")
@@ -414,26 +405,11 @@ class Parser:
         self.expect("WHILE")
 
         condition = self.parse_expression()
-
         self.expect("COLON")
 
-        # -----------------------------------------------------
-        # One-line WHILE
-        # -----------------------------------------------------
-
         if not self.check("NEWLINE"):
-            body = [
-                self.parse_statement()
-            ]
-
-            return While(
-                condition,
-                body,
-            )
-
-        # -----------------------------------------------------
-        # Multi-line WHILE
-        # -----------------------------------------------------
+            body = [self.parse_statement()]
+            return While(condition, body)
 
         self.expect("NEWLINE")
         self.expect("INDENT")
@@ -442,18 +418,13 @@ class Parser:
 
         self.skip_newlines()
 
-        while not self.check("DEDENT"):
-            body.append(
-                self.parse_statement()
-            )
+        while not self.check("DEDENT") and not self.check("EOF"):
+            body.append(self.parse_statement())
             self.skip_newlines()
 
         self.expect("DEDENT")
 
-        return While(
-            condition,
-            body,
-        )
+        return While(condition, body)
 
     # =========================================================
     # Repeat
@@ -463,26 +434,11 @@ class Parser:
         self.expect("REPEAT")
 
         count = self.parse_expression()
-
         self.expect("COLON")
 
-        # -----------------------------------------------------
-        # One-line REPEAT
-        # -----------------------------------------------------
-
         if not self.check("NEWLINE"):
-            body = [
-                self.parse_statement()
-            ]
-
-            return Repeat(
-                count,
-                body,
-            )
-
-        # -----------------------------------------------------
-        # Multi-line REPEAT
-        # -----------------------------------------------------
+            body = [self.parse_statement()]
+            return Repeat(count, body)
 
         self.expect("NEWLINE")
         self.expect("INDENT")
@@ -491,44 +447,30 @@ class Parser:
 
         self.skip_newlines()
 
-        while not self.check("DEDENT"):
-            body.append(
-                self.parse_statement()
-            )
+        while not self.check("DEDENT") and not self.check("EOF"):
+            body.append(self.parse_statement())
             self.skip_newlines()
 
         self.expect("DEDENT")
 
-        return Repeat(
-            count,
-            body,
-        )
-    
+        return Repeat(count, body)
+
     # =========================================================
-    # for
+    # For
     # =========================================================
 
     def parse_for(self):
         self.expect("FOR")
 
         variable = self.expect("IDENTIFIER").value
-
         self.expect("IN")
 
         iterable = self.parse_expression()
-
         self.expect("COLON")
 
         if not self.check("NEWLINE"):
-            body = [
-                self.parse_statement()
-            ]
-
-            return For(
-                variable,
-                iterable,
-                body,
-            )
+            body = [self.parse_statement()]
+            return For(variable, iterable, body)
 
         self.expect("NEWLINE")
         self.expect("INDENT")
@@ -537,19 +479,13 @@ class Parser:
 
         self.skip_newlines()
 
-        while not self.check("DEDENT"):
-            body.append(
-                self.parse_statement()
-            )
+        while not self.check("DEDENT") and not self.check("EOF"):
+            body.append(self.parse_statement())
             self.skip_newlines()
 
         self.expect("DEDENT")
 
-        return For(
-            variable,
-            iterable,
-            body,
-        )
+        return For(variable, iterable, body)
 
     # =========================================================
     # Expressions
@@ -565,11 +501,7 @@ class Parser:
             operator = self.advance().value
             right = self.parse_and()
 
-            left = BinaryOp(
-                left,
-                operator,
-                right,
-            )
+            left = BinaryOp(left, operator, right)
 
         return left
 
@@ -580,11 +512,7 @@ class Parser:
             operator = self.advance().value
             right = self.parse_comparison()
 
-            left = BinaryOp(
-                left,
-                operator,
-                right,
-            )
+            left = BinaryOp(left, operator, right)
 
         return left
 
@@ -602,11 +530,7 @@ class Parser:
             operator = self.advance().value
             right = self.parse_term()
 
-            left = BinaryOp(
-                left,
-                operator,
-                right,
-            )
+            left = BinaryOp(left, operator, right)
 
         return left
 
@@ -620,11 +544,7 @@ class Parser:
             operator = self.advance().value
             right = self.parse_factor()
 
-            left = BinaryOp(
-                left,
-                operator,
-                right,
-            )
+            left = BinaryOp(left, operator, right)
 
         return left
 
@@ -639,13 +559,13 @@ class Parser:
             operator = self.advance().value
             right = self.parse_unary()
 
-            left = BinaryOp(
-                left,
-                operator,
-                right,
-            )
+            left = BinaryOp(left, operator, right)
 
         return left
+
+    # =========================================================
+    # Unary operators
+    # =========================================================
 
     def parse_unary(self):
         if self.check_operator("-"):
@@ -664,7 +584,26 @@ class Parser:
                 self.parse_unary(),
             )
 
-        return self.parse_primary()
+        return self.parse_postfix()
+
+    # =========================================================
+    # Postfix expressions: indexing
+    # =========================================================
+
+    def parse_postfix(self):
+        expression = self.parse_primary()
+
+        while self.match("LBRACKET"):
+            index = self.parse_expression()
+            self.expect("RBRACKET")
+
+            expression = Index(expression, index)
+
+        return expression
+
+    # =========================================================
+    # Primary expressions
+    # =========================================================
 
     def parse_primary(self):
         token = self.current()
@@ -685,9 +624,27 @@ class Parser:
             self.advance()
             return Boolean(False)
 
-        if token.type == "INPUT":
+        # List literals: [], [1, 2, 3], [[1, 2], [3, 4]]
+        if token.type == "LBRACKET":
             self.advance()
 
+            elements = []
+
+            if not self.check("RBRACKET"):
+                elements.append(self.parse_expression())
+
+                while self.match("COMMA"):
+                    if self.check("RBRACKET"):
+                        break
+
+                    elements.append(self.parse_expression())
+
+            self.expect("RBRACKET")
+
+            return ListLiteral(elements)
+
+        if token.type == "INPUT":
+            self.advance()
             self.expect("LPAREN")
 
             prompt = self.parse_expression()
@@ -698,7 +655,6 @@ class Parser:
 
         if token.type == "TYPE":
             self.advance()
-
             self.expect("LPAREN")
 
             value = self.parse_expression()
@@ -710,33 +666,20 @@ class Parser:
         if token.type == "IDENTIFIER":
             name = self.advance().value
 
-            if self.check("LPAREN"):
-                self.advance()
-
+            if self.match("LPAREN"):
                 arguments = []
 
                 if not self.check("RPAREN"):
-                    arguments.append(
-                        self.parse_expression()
-                    )
+                    arguments.append(self.parse_expression())
 
                     while self.match("COMMA"):
-                        arguments.append(
-                            self.parse_expression()
-                        )
+                        arguments.append(self.parse_expression())
 
                 self.expect("RPAREN")
 
-                return Call(
-                    name,
-                    arguments,
-                )
+                return Call(name, arguments)
 
             return Variable(name)
-
-        if token.type == "IDENTIFIER":
-            self.advance()
-            return Variable(token.value)
 
         if token.type == "LPAREN":
             self.advance()
@@ -753,29 +696,6 @@ class Parser:
             token.column,
         )
 
-    # =========================================================
-    # Operators
-    # =========================================================
-
-    def check_operator(self, operator):
-        return (
-            self.current().type == "OPERATOR"
-            and self.current().value == operator
-        )
-
-    def expect_operator(self, operator):
-        if not self.check_operator(operator):
-            token = self.current()
-
-            raise ParserError(
-                f"Expected operator {operator!r}, "
-                f"got {token.value!r}",
-                token.line,
-                token.column,
-            )
-
-        return self.advance()
-
 
 # =============================================================
 # Public API
@@ -785,7 +705,6 @@ def parse_program(code):
     from orbit.lexer import Lexer
 
     tokens = Lexer(code).tokenize()
-
     parser = Parser(tokens)
 
     return parser.parse()

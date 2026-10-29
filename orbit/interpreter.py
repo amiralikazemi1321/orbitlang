@@ -20,26 +20,63 @@ from orbit.ast import (
     Continue,
     FunctionDef,
     Return,
+    ListLiteral,
+    Index,
+    IndexAssign,
 )
-
 from orbit.parser import parse_program
 
 
 class InterpreterError(Exception):
     pass
 
+
 class BreakSignal(Exception):
     pass
 
+
 class ContinueSignal(Exception):
     pass
+
 
 class ReturnSignal(Exception):
     def __init__(self, value):
         self.value = value
 
-class Interpreter:
 
+class IndexOutOfRangeError(InterpreterError):
+    def __init__(self, index, line=None, column=None):
+        self.index = index
+        self.line = line
+        self.column = column
+
+        super().__init__(f"List index out of range: {index}")
+
+
+class InvalidIndexTypeError(InterpreterError):
+    def __init__(self, index, line=None, column=None):
+        self.index = index
+        self.line = line
+        self.column = column
+
+        super().__init__(
+            f"List index must be an integer, "
+            f"got {type(index).__name__}."
+        )
+
+
+class InvalidAssignmentTargetError(InterpreterError):
+    def __init__(self, target_type, line=None, column=None):
+        self.target_type = target_type
+        self.line = line
+        self.column = column
+
+        super().__init__(
+            f"Cannot assign to indexed value of type {target_type}."
+        )
+
+
+class Interpreter:
     def __init__(self):
         self.variables = {}
         self.functions = {}
@@ -50,9 +87,7 @@ class Interpreter:
 
     def run(self, program):
         if not isinstance(program, Program):
-            raise InterpreterError(
-                "Expected a Program node."
-            )
+            raise InterpreterError("Expected a Program node.")
 
         self.run_block(program.statements)
 
@@ -69,92 +104,71 @@ class Interpreter:
     # =========================================================
 
     def execute(self, statement):
-
         if isinstance(statement, Assign):
-            value = self.evaluate(
-                statement.value
-            )
-
-            self.variables[
-                statement.name
-            ] = value
-
+            value = self.evaluate(statement.value)
+            self.variables[statement.name] = value
             return
 
+        if isinstance(statement, IndexAssign):
+            value = self.evaluate(statement.value)
+            collection = self.evaluate(statement.collection)
+            index = self.evaluate(statement.index)
+
+            if not isinstance(index, int) or isinstance(index, bool):
+                raise InvalidIndexTypeError(index)
+
+            if not isinstance(collection, list):
+                raise InvalidAssignmentTargetError(
+                    type(collection).__name__
+                )
+
+            try:
+                collection[index] = value
+            except IndexError:
+                raise IndexOutOfRangeError(index) from None
+
+            return
 
         if isinstance(statement, Show):
-            value = self.evaluate(
-                statement.value
-            )
-
-            print(value)
-
+            print(self.evaluate(statement.value))
             return
 
-
         if isinstance(statement, If):
-
-            condition = self.evaluate(
-                statement.condition
-            )
+            condition = self.evaluate(statement.condition)
 
             if self.is_truthy(condition):
-                self.run_block(
-                    statement.body
-                )
-
+                self.run_block(statement.body)
                 return
 
-            for (
-                elif_condition,
-                elif_body,
-            ) in statement.elif_branches or []:
-
-                condition = self.evaluate(
-                    elif_condition
-                )
-
-                if self.is_truthy(condition):
-                    self.run_block(
-                        elif_body
-                    )
-
+            for elif_condition, elif_body in (
+                statement.elif_branches or []
+            ):
+                if self.is_truthy(self.evaluate(elif_condition)):
+                    self.run_block(elif_body)
                     return
 
             if statement.else_body is not None:
-                self.run_block(
-                    statement.else_body
-                )
+                self.run_block(statement.else_body)
 
             return
 
-
         if isinstance(statement, While):
             while self.is_truthy(
-                self.evaluate(
-                    statement.condition
-                )
+                self.evaluate(statement.condition)
             ):
                 try:
-                    self.run_block(
-                        statement.body
-                    )
-
+                    self.run_block(statement.body)
                 except ContinueSignal:
                     continue
-
                 except BreakSignal:
                     break
 
             return
 
-
         if isinstance(statement, Repeat):
-            count = self.evaluate(
-                statement.count
-            )
+            count = self.evaluate(statement.count)
 
-            if not isinstance(count, int):
+            if not isinstance(count, int) or isinstance(count, bool):
                 raise InterpreterError(
                     "Repeat count must be an integer."
                 )
@@ -166,13 +180,9 @@ class Interpreter:
 
             for _ in range(count):
                 try:
-                    self.run_block(
-                        statement.body
-                    )
-
+                    self.run_block(statement.body)
                 except ContinueSignal:
                     continue
-
                 except BreakSignal:
                     break
 
@@ -190,13 +200,9 @@ class Interpreter:
                 self.variables[statement.variable] = value
 
                 try:
-                    self.run_block(
-                        statement.body
-                    )
-
+                    self.run_block(statement.body)
                 except ContinueSignal:
                     continue
-
                 except BreakSignal:
                     break
 
@@ -206,7 +212,10 @@ class Interpreter:
             value = self.evaluate(statement.value)
 
             if statement.type_name == "number":
-                if not isinstance(value, (int, float)) or isinstance(value, bool):
+                if (
+                    not isinstance(value, (int, float))
+                    or isinstance(value, bool)
+                ):
                     raise InterpreterError(
                         f"Expected number, got {type(value).__name__}."
                     )
@@ -224,12 +233,10 @@ class Interpreter:
                     )
 
             self.variables[statement.name] = value
-
             return
 
         if isinstance(statement, Break):
             raise BreakSignal()
-
 
         if isinstance(statement, Continue):
             raise ContinueSignal()
@@ -251,8 +258,7 @@ class Interpreter:
             raise ReturnSignal(value)
 
         raise InterpreterError(
-            f"Unknown statement: "
-            f"{type(statement).__name__}"
+            f"Unknown statement: {type(statement).__name__}"
         )
 
     # =========================================================
@@ -260,61 +266,64 @@ class Interpreter:
     # =========================================================
 
     def evaluate(self, expression):
-
         if isinstance(expression, Number):
             return expression.value
-
 
         if isinstance(expression, String):
             return expression.value
 
-
         if isinstance(expression, Boolean):
             return expression.value
 
-
         if isinstance(expression, Variable):
-
             if expression.name not in self.variables:
                 raise InterpreterError(
-                    f"Undefined variable: "
-                    f"{expression.name}"
+                    f"Undefined variable: {expression.name}"
                 )
 
-            return self.variables[
-                expression.name
+            return self.variables[expression.name]
+
+        if isinstance(expression, ListLiteral):
+            return [
+                self.evaluate(element)
+                for element in expression.elements
             ]
 
+        if isinstance(expression, Index):
+            collection = self.evaluate(expression.collection)
+            index = self.evaluate(expression.index)
 
-        # ==========================
-        # INPUT SUPPORT
-        # ==========================
+            if not isinstance(index, int) or isinstance(index, bool):
+                raise InvalidIndexTypeError(index)
+
+            if not isinstance(collection, (list, str)):
+                raise InterpreterError(
+                    "Indexing requires a list or string."
+                )
+
+            try:
+                return collection[index]
+            except IndexError:
+                raise IndexOutOfRangeError(index) from None
 
         if isinstance(expression, Input):
-
-            prompt = self.evaluate(
-                expression.prompt
-            )
-
+            prompt = self.evaluate(expression.prompt)
             return input(prompt)
 
         if isinstance(expression, TypeOf):
-
-            value = self.evaluate(
-                expression.value
-            )
+            value = self.evaluate(expression.value)
 
             if isinstance(value, bool):
                 return "boolean"
 
-            if isinstance(value, int):
-                return "number"
-
-            if isinstance(value, float):
+            if isinstance(value, (int, float)):
                 return "number"
 
             if isinstance(value, str):
                 return "string"
+
+            if isinstance(value, list):
+                return "list"
 
             return "unknown"
 
@@ -322,23 +331,18 @@ class Interpreter:
             return self.evaluate_call(expression)
 
         if isinstance(expression, BinaryOp):
-
-            return self.evaluate_binary(
-                expression
-            )
-
+            return self.evaluate_binary(expression)
 
         if isinstance(expression, UnaryOp):
-
-            return self.evaluate_unary(
-                expression
-            )
-
+            return self.evaluate_unary(expression)
 
         raise InterpreterError(
-            f"Unknown expression: "
-            f"{type(expression).__name__}"
+            f"Unknown expression: {type(expression).__name__}"
         )
+
+    # =========================================================
+    # Function calls
+    # =========================================================
 
     def evaluate_call(self, expression):
         if expression.name in self.functions:
@@ -350,27 +354,29 @@ class Interpreter:
                     f"{len(function.parameters)} arguments."
                 )
 
-            old_variables = self.variables
+            arguments = [
+                self.evaluate(argument)
+                for argument in expression.arguments
+            ]
 
+            old_variables = self.variables
             self.variables = old_variables.copy()
 
             for parameter, argument in zip(
                 function.parameters,
-                expression.arguments,
+                arguments,
             ):
-                self.variables[parameter] = self.evaluate(argument)
+                self.variables[parameter] = argument
 
             try:
                 self.run_block(function.body)
-
             except ReturnSignal as signal:
-                self.variables = old_variables
                 return signal.value
-
-            self.variables = old_variables
+            finally:
+                self.variables = old_variables
 
             return None
-        
+
         if expression.name == "range":
             arguments = [
                 self.evaluate(argument)
@@ -390,10 +396,7 @@ class Interpreter:
                 return range(arguments[0])
 
             if len(arguments) == 2:
-                return range(
-                    arguments[0],
-                    arguments[1],
-                )
+                return range(arguments[0], arguments[1])
 
             if len(arguments) == 3:
                 return range(
@@ -406,6 +409,24 @@ class Interpreter:
                 "range() expects 1 to 3 arguments."
             )
 
+        if expression.name == "int":
+            arguments = [
+                self.evaluate(argument)
+                for argument in expression.arguments
+            ]
+
+            if len(arguments) != 1:
+                raise InterpreterError(
+                    "int() expects 1 argument."
+                )
+
+            try:
+                return int(arguments[0])
+            except (ValueError, TypeError):
+                raise InterpreterError(
+                    f"Cannot convert {arguments[0]!r} to an integer."
+                ) from None
+
         raise InterpreterError(
             f"Unknown function: {expression.name}"
         )
@@ -415,106 +436,69 @@ class Interpreter:
     # =========================================================
 
     def evaluate_binary(self, expression):
-
         operator = expression.operator
 
-
         if operator == "and":
-
-            left = self.evaluate(
-                expression.left
-            )
+            left = self.evaluate(expression.left)
 
             if not self.is_truthy(left):
                 return False
 
-            right = self.evaluate(
-                expression.right
+            return self.is_truthy(
+                self.evaluate(expression.right)
             )
-
-            return self.is_truthy(right)
-
 
         if operator == "or":
-
-            left = self.evaluate(
-                expression.left
-            )
+            left = self.evaluate(expression.left)
 
             if self.is_truthy(left):
                 return True
 
-            right = self.evaluate(
-                expression.right
+            return self.is_truthy(
+                self.evaluate(expression.right)
             )
 
-            return self.is_truthy(right)
-
-
-        left = self.evaluate(
-            expression.left
-        )
-
-        right = self.evaluate(
-            expression.right
-        )
-
+        left = self.evaluate(expression.left)
+        right = self.evaluate(expression.right)
 
         if operator == "+":
             return left + right
 
-
         if operator == "-":
             return left - right
-
 
         if operator == "*":
             return left * right
 
-
         if operator == "/":
-
             if right == 0:
-                raise InterpreterError(
-                    "Division by zero."
-                )
+                raise InterpreterError("Division by zero.")
 
             return left / right
 
-
         if operator == "%":
-
             if right == 0:
-                raise InterpreterError(
-                    "Modulo by zero."
-                )
+                raise InterpreterError("Modulo by zero.")
 
             return left % right
-
 
         if operator == "==":
             return left == right
 
-
         if operator == "!=":
             return left != right
-
 
         if operator == "<":
             return left < right
 
-
         if operator == ">":
             return left > right
-
 
         if operator == "<=":
             return left <= right
 
-
         if operator == ">=":
             return left >= right
-
 
         raise InterpreterError(
             f"Unknown operator: {operator}"
@@ -525,22 +509,16 @@ class Interpreter:
     # =========================================================
 
     def evaluate_unary(self, expression):
-
-        value = self.evaluate(
-            expression.operand
-        )
+        value = self.evaluate(expression.operand)
 
         if expression.operator == "-":
             return -value
 
-
         if expression.operator == "not":
             return not self.is_truthy(value)
 
-
         raise InterpreterError(
-            f"Unknown unary operator: "
-            f"{expression.operator}"
+            f"Unknown unary operator: {expression.operator}"
         )
 
     # =========================================================
@@ -555,16 +533,10 @@ class Interpreter:
     # =========================================================
 
     def run_file(self, filename):
-
-        with open(
-            filename,
-            "r",
-            encoding="utf-8",
-        ) as file:
+        with open(filename, "r", encoding="utf-8") as file:
             code = file.read()
 
         program = parse_program(code)
-
         self.run(program)
 
 
@@ -573,7 +545,5 @@ class Interpreter:
 # =============================================================
 
 def run_file(filename):
-
     interpreter = Interpreter()
-
     interpreter.run_file(filename)

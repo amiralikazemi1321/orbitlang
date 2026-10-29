@@ -1,9 +1,0 @@
-x = 10
-show x
-
-if x > 5: show "big"
-
-if x == 10:
-    show "ten"
-else:
-    show "not ten"

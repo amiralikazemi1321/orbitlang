@@ -1,0 +1,7 @@
+numbers = [10, 20, 30]
+
+show numbers[0]
+show numbers[2]
+
+matrix = [[1, 2], [3, 4]]
+show matrix[1][0]

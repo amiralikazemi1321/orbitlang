@@ -37,7 +37,11 @@ KEYWORDS = {
 
 
 class LexerError(Exception):
-    pass
+    def __init__(self, message, line, column):
+        self.message = message
+        self.line = line
+        self.column = column
+        super().__init__(message)
 
 
 class Lexer:
@@ -72,11 +76,14 @@ class Lexer:
             # Count indentation.
             indentation = self._get_indentation(line)
 
-            content = line[indentation:]
+            # Number of leading whitespace characters. A tab counts as
+            # four columns of indentation but is only one character.
+            leading = len(line) - len(line.lstrip(" \t"))
 
             self._handle_indentation(indentation)
 
-            self._tokenize_line(content)
+            # Start after the indentation so columns are absolute.
+            self._tokenize_line(line, leading)
 
             # Every logical source line ends with NEWLINE.
             self.tokens.append(
@@ -170,7 +177,9 @@ class Lexer:
             # Indentation must match an existing level.
             if indentation != self.indent_stack[-1]:
                 raise LexerError(
-                    f"Invalid indentation at line {self.line}"
+                    "Invalid indentation",
+                    self.line,
+                    1,
                 )
 
     # =========================================================
@@ -215,8 +224,8 @@ class Lexer:
     # Line tokenizer
     # =========================================================
 
-    def _tokenize_line(self, line):
-        i = 0
+    def _tokenize_line(self, line, start_index=0):
+        i = start_index
 
         while i < len(line):
             char = line[i]
@@ -344,11 +353,13 @@ class Lexer:
             # -------------------------------------------------
             # Punctuation
             # -------------------------------------------------
-
+            
             punctuation = {
                 ":": "COLON",
                 "(": "LPAREN",
                 ")": "RPAREN",
+                "[": "LBRACKET",
+                "]": "RBRACKET",
                 ",": "COMMA",
             }
 
@@ -370,9 +381,9 @@ class Lexer:
             # -------------------------------------------------
 
             raise LexerError(
-                f"Unexpected character {char!r} "
-                f"at line {self.line}, "
-                f"column {i + 1}"
+                f"Unexpected character {char!r}",
+                self.line,
+                i + 1,
             )
 
     # =========================================================
@@ -416,9 +427,9 @@ class Lexer:
 
                 if i >= len(line):
                     raise LexerError(
-                        f"Unterminated string at line "
-                        f"{self.line}, "
-                        f"column {start + 1}"
+                        "Unterminated string",
+                        self.line,
+                        start + 1,
                     )
 
                 escaped_char = line[i]
@@ -437,8 +448,7 @@ class Lexer:
             i += 1
 
         raise LexerError(
-            f"Unterminated string at line "
-            f"{self.line}, "
-            f"column {start + 1}"
+            "Unterminated string",
+            self.line,
+            start + 1,
         )
-

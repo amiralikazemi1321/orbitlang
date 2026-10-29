@@ -73,7 +73,7 @@ class For:
     variable: str
     iterable: object
     body: list
-    
+
 @dataclass
 class FunctionDef:
     name: str
@@ -83,7 +83,7 @@ class FunctionDef:
 @dataclass
 class Return:
     value: object | None
-    
+
 @dataclass
 class Break:
     pass
@@ -111,3 +111,17 @@ class TypedAssign:
     name: str
     value: object
 
+@dataclass
+class ListLiteral:
+    elements: list
+
+@dataclass
+class Index:
+    collection: object
+    index: object
+
+@dataclass
+class IndexAssign:
+    collection: object
+    index: object
+    value: object

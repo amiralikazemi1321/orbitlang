@@ -1,0 +1,12 @@
+i = int(input('enter first number: '))
+j = int(input('enter second number: '))
+
+k = i + j
+h = i * j
+m = i / j
+n = i - j
+
+show k
+show h
+show m
+show n

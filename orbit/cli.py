@@ -1,3 +1,4 @@
+
 import os
 import sys
 
@@ -28,14 +29,11 @@ def repl():
                 continue
 
             program = parse_program(code)
-
             interpreter.run(program)
 
         except (LexerError, ParserError) as error:
             print(f"Orbit error: {error.message}")
-            print(
-                f"  --> <repl>:{error.line}:{error.column}"
-            )
+            print(f"  --> <repl>:{error.line}:{error.column}")
 
         except InterpreterError as error:
             print(f"Orbit error: {error}")
@@ -43,6 +41,11 @@ def repl():
         except KeyboardInterrupt:
             print()
             break
+
+        except EOFError:
+            print()
+            break
+
 
 def main():
     if len(sys.argv) < 2:
@@ -64,11 +67,12 @@ def main():
 
         except (LexerError, ParserError) as error:
             print(f"Orbit error: {error.message}")
-            print(
-                f"  --> {filename}:{error.line}:{error.column}"
-            )
+            print(f"  --> {filename}:{error.line}:{error.column}")
 
         except InterpreterError as error:
+            print(f"Orbit error: {error}")
+
+        except OSError as error:
             print(f"Orbit error: {error}")
 
     elif command == "repl":

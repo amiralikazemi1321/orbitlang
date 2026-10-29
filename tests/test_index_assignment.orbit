@@ -1,0 +1,11 @@
+
+numbers = [10, 20, 30]
+numbers[0] = 99
+show numbers
+
+matrix = [[1, 2], [3, 4]]
+matrix[1][0] = 99
+show matrix
+
+numbers[2] = 50
+show numbers
