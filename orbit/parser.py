@@ -24,6 +24,7 @@ from orbit.ast import (
     ListLiteral,
     Index,
     IndexAssign,
+    Dictionary,
 )
 
 
@@ -192,7 +193,7 @@ class Parser:
         )
 
     # =========================================================
-    # Function
+    # Function definitions
     # =========================================================
 
     def parse_function(self):
@@ -237,9 +238,6 @@ class Parser:
         name = self.expect("IDENTIFIER").value
         target = Variable(name)
 
-        # Parse chained indexing:
-        # numbers[0]
-        # matrix[1][0]
         while self.match("LBRACKET"):
             index = self.parse_expression()
             self.expect("RBRACKET")
@@ -516,6 +514,10 @@ class Parser:
 
         return left
 
+    # =========================================================
+    # Comparison, including membership
+    # =========================================================
+
     def parse_comparison(self):
         left = self.parse_term()
 
@@ -526,6 +528,7 @@ class Parser:
             or self.check_operator(">")
             or self.check_operator("<=")
             or self.check_operator(">=")
+            or self.check("IN")
         ):
             operator = self.advance().value
             right = self.parse_term()
@@ -533,6 +536,43 @@ class Parser:
             left = BinaryOp(left, operator, right)
 
         return left
+
+    # =========================================================
+    # Dictionary literals
+    # =========================================================
+
+    def parse_dictionary(self):
+        self.expect("LBRACE")
+
+        pairs = []
+
+        self.skip_newlines()
+
+        if not self.check("RBRACE"):
+            while True:
+                key = self.parse_expression()
+                self.expect("COLON")
+
+                value = self.parse_expression()
+                pairs.append((key, value))
+
+                self.skip_newlines()
+
+                if not self.match("COMMA"):
+                    break
+
+                self.skip_newlines()
+
+                if self.check("RBRACE"):
+                    break
+
+        self.expect("RBRACE")
+
+        return Dictionary(pairs)
+
+    # =========================================================
+    # Arithmetic terms
+    # =========================================================
 
     def parse_term(self):
         left = self.parse_factor()
@@ -624,7 +664,10 @@ class Parser:
             self.advance()
             return Boolean(False)
 
-        # List literals: [], [1, 2, 3], [[1, 2], [3, 4]]
+        if token.type == "LBRACE":
+            return self.parse_dictionary()
+
+        # List literals
         if token.type == "LBRACKET":
             self.advance()
 

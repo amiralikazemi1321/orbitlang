@@ -1,0 +1,60 @@
+person = {
+    "name": "Alex",
+    "age": 25,
+    "active": True
+}
+
+show person["name"]
+show person["age"]
+show type(person)
+
+person["age"] = 30
+show person["age"]
+
+person["city"] = "London"
+show person["city"]
+
+# Length
+show len(person)
+
+# Keys
+show keys(person)
+
+# Values
+show values(person)
+
+# Membership
+show "name" in person
+show "email" in person
+
+# Remove
+removed = remove(person, "age")
+show removed
+show person
+
+# Clear
+data = {
+    "a": 1,
+    "b": 2
+}
+
+clear(data)
+show data
+show len(data)
+
+# Merge
+first = {
+    "product": "Laptop",
+    "price": 1200
+}
+
+second = {
+    "category": "Electronics",
+    "price": 1500
+}
+
+combined = merge(first, second)
+
+show combined
+show first
+show second

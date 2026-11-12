@@ -1,0 +1,10 @@
+show true
+show false
+
+if true:
+    show "It works!"
+
+if false:
+    show "This should not appear."
+else:
+    show "False works!"

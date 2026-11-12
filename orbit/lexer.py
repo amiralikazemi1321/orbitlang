@@ -1,3 +1,4 @@
+
 from dataclasses import dataclass
 
 
@@ -20,8 +21,8 @@ KEYWORDS = {
     "in": "IN",
     "break": "BREAK",
     "continue": "CONTINUE",
-    "true": "TRUE",
-    "false": "FALSE",
+    "True": "TRUE",
+    "False": "FALSE",
     "and": "AND",
     "or": "OR",
     "not": "NOT",
@@ -29,7 +30,6 @@ KEYWORDS = {
     "type": "TYPE",
     "func": "FUNC",
     "return": "RETURN",
-
     "number": "NUMBER_TYPE",
     "string": "STRING_TYPE",
     "boolean": "BOOLEAN_TYPE",
@@ -53,8 +53,14 @@ class Lexer:
         self.column = 1
 
         # Indentation levels.
-        # The first level is always zero.
         self.indent_stack = [0]
+
+        # Dictionary brace nesting depth.
+        self.brace_depth = 0
+
+    # =========================================================
+    # Tokenization
+    # =========================================================
 
     def tokenize(self):
         lines = self.code.splitlines()
@@ -62,30 +68,23 @@ class Lexer:
         for line_number, raw_line in enumerate(lines, start=1):
             self.line = line_number
 
-            # Completely empty line
             if not raw_line.strip():
                 continue
 
-            # Remove comments while preserving strings.
             line = self._remove_comment(raw_line)
 
-            # A line that contained only a comment
             if not line.strip():
                 continue
 
-            # Count indentation.
             indentation = self._get_indentation(line)
-
-            # Number of leading whitespace characters. A tab counts as
-            # four columns of indentation but is only one character.
             leading = len(line) - len(line.lstrip(" \t"))
 
-            self._handle_indentation(indentation)
+            # Ignore indentation inside dictionary literals.
+            if self.brace_depth == 0:
+                self._handle_indentation(indentation)
 
-            # Start after the indentation so columns are absolute.
             self._tokenize_line(line, leading)
 
-            # Every logical source line ends with NEWLINE.
             self.tokens.append(
                 Token(
                     "NEWLINE",
@@ -95,7 +94,14 @@ class Lexer:
                 )
             )
 
-        # Close all open indentation blocks.
+        if self.brace_depth != 0:
+            raise LexerError(
+                "Unclosed dictionary brace",
+                self.line,
+                1,
+            )
+
+        # Close remaining indentation blocks.
         while len(self.indent_stack) > 1:
             self.indent_stack.pop()
 
@@ -131,7 +137,6 @@ class Lexer:
                 count += 1
 
             elif char == "\t":
-                # Treat a tab as four spaces.
                 count += 4
 
             else:
@@ -142,7 +147,7 @@ class Lexer:
     def _handle_indentation(self, indentation):
         current = self.indent_stack[-1]
 
-        # Increased indentation
+        # Increased indentation.
         if indentation > current:
             self.indent_stack.append(indentation)
 
@@ -157,7 +162,7 @@ class Lexer:
 
             return
 
-        # Decreased indentation
+        # Decreased indentation.
         if indentation < current:
             while (
                 len(self.indent_stack) > 1
@@ -174,7 +179,6 @@ class Lexer:
                     )
                 )
 
-            # Indentation must match an existing level.
             if indentation != self.indent_stack[-1]:
                 raise LexerError(
                     "Invalid indentation",
@@ -226,6 +230,17 @@ class Lexer:
 
     def _tokenize_line(self, line, start_index=0):
         i = start_index
+
+        punctuation = {
+            ":": "COLON",
+            "(": "LPAREN",
+            ")": "RPAREN",
+            "[": "LBRACKET",
+            "]": "RBRACKET",
+            ",": "COMMA",
+            "{": "LBRACE",
+            "}": "RBRACE",
+        }
 
         while i < len(line):
             char = line[i]
@@ -353,15 +368,6 @@ class Lexer:
             # -------------------------------------------------
             # Punctuation
             # -------------------------------------------------
-            
-            punctuation = {
-                ":": "COLON",
-                "(": "LPAREN",
-                ")": "RPAREN",
-                "[": "LBRACKET",
-                "]": "RBRACKET",
-                ",": "COMMA",
-            }
 
             if char in punctuation:
                 self.tokens.append(
@@ -372,6 +378,19 @@ class Lexer:
                         i + 1,
                     )
                 )
+
+                if char == "{":
+                    self.brace_depth += 1
+
+                elif char == "}":
+                    self.brace_depth -= 1
+
+                    if self.brace_depth < 0:
+                        raise LexerError(
+                            "Unexpected closing brace",
+                            self.line,
+                            i + 1,
+                        )
 
                 i += 1
                 continue

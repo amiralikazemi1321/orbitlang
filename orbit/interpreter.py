@@ -1,3 +1,4 @@
+
 from orbit.ast import (
     Number,
     String,
@@ -23,6 +24,7 @@ from orbit.ast import (
     ListLiteral,
     Index,
     IndexAssign,
+    Dictionary,
 )
 from orbit.parser import parse_program
 
@@ -49,7 +51,6 @@ class IndexOutOfRangeError(InterpreterError):
         self.index = index
         self.line = line
         self.column = column
-
         super().__init__(f"List index out of range: {index}")
 
 
@@ -58,7 +59,6 @@ class InvalidIndexTypeError(InterpreterError):
         self.index = index
         self.line = line
         self.column = column
-
         super().__init__(
             f"List index must be an integer, "
             f"got {type(index).__name__}."
@@ -70,7 +70,6 @@ class InvalidAssignmentTargetError(InterpreterError):
         self.target_type = target_type
         self.line = line
         self.column = column
-
         super().__init__(
             f"Cannot assign to indexed value of type {target_type}."
         )
@@ -113,6 +112,15 @@ class Interpreter:
             value = self.evaluate(statement.value)
             collection = self.evaluate(statement.collection)
             index = self.evaluate(statement.index)
+
+            if isinstance(collection, dict):
+                try:
+                    collection[index] = value
+                except TypeError:
+                    raise InterpreterError(
+                        f"Invalid dictionary key: {index!r}"
+                    ) from None
+                return
 
             if not isinstance(index, int) or isinstance(index, bool):
                 raise InvalidIndexTypeError(index)
@@ -289,16 +297,44 @@ class Interpreter:
                 for element in expression.elements
             ]
 
+        if isinstance(expression, Dictionary):
+            result = {}
+
+            for key, value in expression.pairs:
+                evaluated_key = self.evaluate(key)
+                evaluated_value = self.evaluate(value)
+
+                try:
+                    result[evaluated_key] = evaluated_value
+                except TypeError:
+                    raise InterpreterError(
+                        f"Invalid dictionary key: {evaluated_key!r}"
+                    ) from None
+
+            return result
+
         if isinstance(expression, Index):
             collection = self.evaluate(expression.collection)
             index = self.evaluate(expression.index)
+
+            if isinstance(collection, dict):
+                try:
+                    return collection[index]
+                except KeyError:
+                    raise InterpreterError(
+                        f"Dictionary key not found: {index!r}"
+                    ) from None
+                except TypeError:
+                    raise InterpreterError(
+                        f"Invalid dictionary key: {index!r}"
+                    ) from None
 
             if not isinstance(index, int) or isinstance(index, bool):
                 raise InvalidIndexTypeError(index)
 
             if not isinstance(collection, (list, str)):
                 raise InterpreterError(
-                    "Indexing requires a list or string."
+                    "Indexing requires a list, string, or dictionary."
                 )
 
             try:
@@ -324,6 +360,9 @@ class Interpreter:
 
             if isinstance(value, list):
                 return "list"
+
+            if isinstance(value, dict):
+                return "dictionary"
 
             return "unknown"
 
@@ -377,12 +416,16 @@ class Interpreter:
 
             return None
 
-        if expression.name == "range":
-            arguments = [
-                self.evaluate(argument)
-                for argument in expression.arguments
-            ]
+        arguments = [
+            self.evaluate(argument)
+            for argument in expression.arguments
+        ]
 
+        # -----------------------------------------------------
+        # range()
+        # -----------------------------------------------------
+
+        if expression.name == "range":
             if not all(
                 isinstance(value, int)
                 and not isinstance(value, bool)
@@ -409,12 +452,11 @@ class Interpreter:
                 "range() expects 1 to 3 arguments."
             )
 
-        if expression.name == "int":
-            arguments = [
-                self.evaluate(argument)
-                for argument in expression.arguments
-            ]
+        # -----------------------------------------------------
+        # int()
+        # -----------------------------------------------------
 
+        if expression.name == "int":
             if len(arguments) != 1:
                 raise InterpreterError(
                     "int() expects 1 argument."
@@ -426,6 +468,133 @@ class Interpreter:
                 raise InterpreterError(
                     f"Cannot convert {arguments[0]!r} to an integer."
                 ) from None
+
+        # -----------------------------------------------------
+        # len()
+        # -----------------------------------------------------
+
+        if expression.name == "len":
+            if len(arguments) != 1:
+                raise InterpreterError(
+                    "len() expects 1 argument."
+                )
+
+            value = arguments[0]
+
+            if not isinstance(value, (dict, list, str, range)):
+                raise InterpreterError(
+                    "len() requires a dictionary, list, string, or range."
+                )
+
+            return len(value)
+
+        # -----------------------------------------------------
+        # keys()
+        # -----------------------------------------------------
+
+        if expression.name == "keys":
+            if len(arguments) != 1:
+                raise InterpreterError(
+                    "keys() expects 1 argument."
+                )
+
+            dictionary = arguments[0]
+
+            if not isinstance(dictionary, dict):
+                raise InterpreterError(
+                    "keys() requires a dictionary."
+                )
+
+            return list(dictionary.keys())
+
+        # -----------------------------------------------------
+        # values()
+        # -----------------------------------------------------
+
+        if expression.name == "values":
+            if len(arguments) != 1:
+                raise InterpreterError(
+                    "values() expects 1 argument."
+                )
+
+            dictionary = arguments[0]
+
+            if not isinstance(dictionary, dict):
+                raise InterpreterError(
+                    "values() requires a dictionary."
+                )
+
+            return list(dictionary.values())
+
+        # -----------------------------------------------------
+        # remove()
+        # -----------------------------------------------------
+
+        if expression.name == "remove":
+            if len(arguments) != 2:
+                raise InterpreterError(
+                    "remove() expects 2 arguments."
+                )
+
+            dictionary, key = arguments
+
+            if not isinstance(dictionary, dict):
+                raise InterpreterError(
+                    "remove() requires a dictionary as its first argument."
+                )
+
+            try:
+                return dictionary.pop(key)
+            except KeyError:
+                raise InterpreterError(
+                    f"Dictionary key not found: {key!r}"
+                ) from None
+            except TypeError:
+                raise InterpreterError(
+                    f"Invalid dictionary key: {key!r}"
+                ) from None
+
+        # -----------------------------------------------------
+        # clear()
+        # -----------------------------------------------------
+
+        if expression.name == "clear":
+            if len(arguments) != 1:
+                raise InterpreterError(
+                    "clear() expects 1 argument."
+                )
+
+            dictionary = arguments[0]
+
+            if not isinstance(dictionary, dict):
+                raise InterpreterError(
+                    "clear() requires a dictionary."
+                )
+
+            dictionary.clear()
+            return None
+
+        # -----------------------------------------------------
+        # merge()
+        # -----------------------------------------------------
+
+        if expression.name == "merge":
+            if len(arguments) != 2:
+                raise InterpreterError(
+                    "merge() expects 2 arguments."
+                )
+
+            first, second = arguments
+
+            if not isinstance(first, dict) or not isinstance(second, dict):
+                raise InterpreterError(
+                    "merge() requires two dictionaries."
+                )
+
+            result = first.copy()
+            result.update(second)
+
+            return result
 
         raise InterpreterError(
             f"Unknown function: {expression.name}"
@@ -460,6 +629,24 @@ class Interpreter:
 
         left = self.evaluate(expression.left)
         right = self.evaluate(expression.right)
+
+        if operator == "in":
+            if not isinstance(right, (dict, list, str)):
+                raise InterpreterError(
+                    "Right operand of 'in' must be a dictionary, list, or string."
+                )
+
+            if isinstance(right, str) and not isinstance(left, str):
+                raise InterpreterError(
+                    "String membership requires a string on the left."
+                )
+
+            try:
+                return left in right
+            except TypeError:
+                raise InterpreterError(
+                    "Invalid value for membership check."
+                ) from None
 
         if operator == "+":
             return left + right

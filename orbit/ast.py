@@ -19,7 +19,10 @@ class Boolean:
 @dataclass
 class Variable:
     name: str
-
+    
+@dataclass
+class Dictionary:
+    pairs: list
 
 @dataclass
 class BinaryOp:

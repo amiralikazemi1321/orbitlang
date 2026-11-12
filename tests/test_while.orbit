@@ -9,3 +9,6 @@ x = 0
 while x < 5: x = x + 1
 
 show x
+
+while True:
+    show 5
