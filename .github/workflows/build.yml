@@ -1,0 +1,79 @@
+
+name: Build OrbitLang
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build executable
+        run: python -m PyInstaller --clean --onefile --console --name orbit --paths . orbit/cli.py
+
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build installer
+        run: iscc installer/windows.iss
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrbitLang-Windows
+          path: dist/OrbitLang-Setup-0.1.0.exe
+
+  macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build executable
+        run: python -m PyInstaller --clean --onefile --console --name orbit --paths . orbit/cli.py
+
+      - name: Prepare DMG
+        run: |
+          mkdir -p staging
+          cp dist/orbit staging/orbit
+          chmod +x staging/orbit
+          printf 'Run ./orbit from Terminal.\n' > staging/README.txt
+
+      - name: Build DMG
+        run: |
+          hdiutil create \
+            -volname OrbitLang \
+            -srcfolder staging \
+            -ov \
+            -format UDZO \
+            dist/OrbitLang-0.1.0.dmg
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: OrbitLang-macOS
+          path: dist/OrbitLang-0.1.0.dmg

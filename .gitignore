@@ -6,3 +6,8 @@ __pycache__/
 .venv/
 venv/
 .env
+build/
+dist/
+AppDir/
+tools/
+*.AppImage

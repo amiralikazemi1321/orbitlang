@@ -1,22 +1,32 @@
 
-import os
 import sys
 
-# Add the project root to PYTHONPATH for development.
-sys.path.append(
-    os.path.dirname(os.path.dirname(__file__))
+from orbit.interpreter import (
+    Interpreter,
+    InterpreterError,
+    run_file,
 )
-
-from orbit.interpreter import Interpreter, InterpreterError, run_file
-from orbit.parser import parse_program, ParserError
+from orbit.parser import (
+    parse_program,
+    ParserError,
+)
 from orbit.lexer import LexerError
+
+
+def print_error(error, filename=None):
+    print(f"Orbit error: {error.message}")
+
+    if filename is None:
+        filename = "<repl>"
+
+    print(f"  --> {filename}:{error.line}:{error.column}")
 
 
 def repl():
     interpreter = Interpreter()
 
     print("OrbitLang REPL")
-    print("Type 'exit' to quit.")
+    print("Type 'exit' or 'quit' to quit.")
 
     while True:
         try:
@@ -32,8 +42,7 @@ def repl():
             interpreter.run(program)
 
         except (LexerError, ParserError) as error:
-            print(f"Orbit error: {error.message}")
-            print(f"  --> <repl>:{error.line}:{error.column}")
+            print_error(error)
 
         except InterpreterError as error:
             print(f"Orbit error: {error}")
@@ -47,39 +56,58 @@ def repl():
             break
 
 
+def print_usage():
+    print("OrbitLang")
+    print()
+    print("Usage:")
+    print("  orbit run <file.orbit>")
+    print("  orbit repl")
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: orbit run <file.orbit>")
-        print("       orbit repl")
+    args = sys.argv[1:]
+
+    if not args:
+        print_usage()
         return
 
-    command = sys.argv[1]
+    command = args[0]
 
     if command == "run":
-        if len(sys.argv) < 3:
+        if len(args) < 2:
             print("Usage: orbit run <file.orbit>")
             return
 
-        filename = sys.argv[2]
+        filename = args[1]
 
         try:
             run_file(filename)
 
         except (LexerError, ParserError) as error:
-            print(f"Orbit error: {error.message}")
-            print(f"  --> {filename}:{error.line}:{error.column}")
+            print_error(error, filename)
 
         except InterpreterError as error:
             print(f"Orbit error: {error}")
 
-        except OSError as error:
+        except (OSError, EOFError) as error:
             print(f"Orbit error: {error}")
+
+        except KeyboardInterrupt:
+            print("\nExecution interrupted.")
 
     elif command == "repl":
         repl()
 
+    elif command in ("help", "--help", "-h"):
+        print_usage()
+
+    elif command in ("version", "--version", "-v"):
+        print("OrbitLang 0.1.0")
+
     else:
-        print("Unknown command:", command)
+        print(f"Unknown command: {command}")
+        print()
+        print_usage()
 
 
 if __name__ == "__main__":
